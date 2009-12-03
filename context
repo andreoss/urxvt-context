@@ -1,0 +1,50 @@
+#!/usr/bin/env perl
+use strict;
+use warnings;
+use List::Util qw(any);
+use Carp qw(carp croak);
+our $EXT     = "context";
+our $VERSION = v1.0.0;
+
+sub set_bg {
+    my ( $self, $colour ) = @_;
+    croak if !$self || !$colour;
+    $self->cmd_parse("\033]11;$colour\007");
+    return;
+}
+
+sub create_callback {
+    my ( $self, $pid ) = @_;
+    return sub {
+        my ($timer) = @_;
+        my $config = $self->{$EXT};
+        chomp( my (@ps) = `ps --ppid $pid -o comm=` );
+        for my $p ( keys %{ $config->{background} } ) {
+            if ( any { $_ eq $p } @ps ) {
+                $self->set_bg( $config->{background}{$p} );
+                return;
+            }
+        }
+        $self->set_bg( $self->x_resource("background") );
+    };
+}
+
+sub on_start {
+    my ($self) = @_;
+    my $config = $self->{$EXT} = {};
+    $config->{background} = ();
+    $config->{names} =
+      [ split( /[,]/x, $self->x_resource("%.names") || "" ) ];
+    for my $p ( @{ $config->{names} } ) {
+        my $c = $self->x_resource("%.$p.background");
+        $config->{background}{$p} = $c || carp "%.$p is undefined";
+    }
+    return ();
+}
+
+sub on_child_start {
+    my ( $self, $pid ) = @_;
+    $self->{timer} =
+      urxvt::timer->new->interval(1)->cb( $self->create_callback($pid) );
+    return ();
+}
