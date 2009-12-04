@@ -1,6 +1,6 @@
 # urxvt-context
 
-A script which switches background colod based on running process.
+A script which switches background colour based on running process.
 
 ## Installation
 
